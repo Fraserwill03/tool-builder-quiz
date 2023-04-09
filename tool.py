@@ -4,6 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import time
 import sys
+import logging
 
 
 # Set outgoing email address and password
@@ -23,8 +24,8 @@ def get_load_data():
     try:
         response = requests.get(URL)
     except requests.exceptions.RequestException as e:
-        print("ERROR retrieving data from MISO:")
-        print(e)
+        logging.error("ERROR connecting to MISO:")
+        logging.error(e)
         while(True):
             try_again = input("Would you like to try again? [Y/N]: ")
             if try_again == "N" or try_again == "n":
@@ -34,11 +35,11 @@ def get_load_data():
                     response = requests.get(URL)
                     break
                 except requests.exceptions.RequestException as e:
-                    print("ERROR connecting to MISO:")
-                    print(e)
+                    logging.error("ERROR connecting to MISO:")
+                    logging.error(e)
                     continue  
             else:
-                print("Invalid input")
+                logging.warning("Invalid input")
                 continue
 
     # parse response data and return most recent load and time
@@ -71,48 +72,67 @@ def send_email(email_address, recent_time, load):
     # If there is an error, takes user input to try again or quit
     try:
         # connects to email server and sends email
+        logging.debug("Connecting to stmp server...")
         server = smtplib.SMTP('smtp.office365.com', 587)
         server.starttls()
         server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
         text = msg.as_string()
         server.sendmail(EMAIL_USERNAME, email_address, text)
         server.quit()
+        logging.info("Email sent successfully")
     except smtplib.SMTPException as e:
-        print("ERROR sending email:")
-        print(e)
+        logging.error("ERROR sending email:")
+        logging.error(e)
         while(True):
             try_again = input("Would you like to try again? [Y/N]: ")
             if try_again == "N" or try_again == "n":
                 quit()
             elif try_again == "Y" or try_again == "y":
                 try:
+                    logging.debug("Reattempting to connect to stmp server...")
                     server = smtplib.SMTP('smtp.office365.com', 587)
                     server.starttls()
                     server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
                     text = msg.as_string()
                     server.sendmail(EMAIL_USERNAME, email_address, text)
                     server.quit()
+                    logging.info("Email sent successfully")
                     break
                 except smtplib.SMTPException as e:
-                    print("ERROR sending email:")
-                    print(e)
+                    logging.error("ERROR sending email:")
+                    logging.error(e)
                     continue
             else:
-                print("Invalid input")
+                logging.warning("Invalid input")
                 continue
 
 
-def main(email_address):
+def main(email_address, log_level):
     """
     Main function.
     Param: 
         email_address: destination email address provided by user as command line argument
+        log_level: log level provided by user as command line argument
     """
+    if log_level == "1":
+        logging.basicConfig(level=logging.ERROR)
+    elif log_level == "2":
+        logging.basicConfig(level=logging.INFO)
+    else:
+        logging.basicConfig(level=logging.DEBUG)
+
     # get initial data
+    logging.debug("Fetching initial data...")
     intial_time, initial_load = get_load_data()
+    if initial_load == None or intial_time == None:
+        logging.error("ERROR: No data found")
+        quit()
+    logging.debug("Initial data fetched")
 
     #send initial email
+    logging.debug("Sending initial email...")
     send_email(email_address, intial_time, initial_load)
+    logging.debug("Initial email sent")
 
     # find current minutes using time module
     current_time = time.localtime()
@@ -138,8 +158,13 @@ def main(email_address):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        logging.critical("Invalid number of arguments\n" + 
+                        "Usage: python tool.py <tool_email_password> " + 
+                        "<destination_email_address> <log_leve>")
+        quit()
     try:
-        main(sys.argv[2])
+        main(sys.argv[2], sys.argv[3])
     except KeyboardInterrupt:
         print("\nQuitting...")
         quit()
