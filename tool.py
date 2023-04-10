@@ -151,14 +151,17 @@ def main(email_address, log_level):
     current_seconds = current_time.tm_sec
     # wait until 10 seconds before the next 5 minute interval
     logging.info("Waiting for next change in data...")
+    logging.debug("(Waiting " + str(5 - current_minute % 5) +
+                   " minutes and " + str(60 - current_seconds) + " seconds)")
     wait_time = (5 - current_minute % 5) * 60 + (60 - current_seconds)
     time.sleep(wait_time - 10)
 
     # loop to check for new data every 10 seconds
     # if new data is found, send email notification, and wait 250 seconds
     logging.debug("Starting loop...")
+    i = 0
     while(True):
-        i = 0
+        i += 1
         logging.debug("Looking for change in data\nIteration: " + str(i))
         logging.debug("Fetching data...")
         recent_time, recent_load = get_load_data()
@@ -174,6 +177,7 @@ def main(email_address, log_level):
             intial_time = recent_time
             initial_load = recent_load
             logging.info("Waiting for next change in data...")
+            logging.debug("(Waiting 250 seconds)")
             time.sleep(250)
         else:
             logging.debug("No change in data found\nWaiting 10 seconds...")
